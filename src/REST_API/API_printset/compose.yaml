@@ -1,10 +1,38 @@
 services:
   mysql:
-    image: 'mysql:latest'
+    image: mysql:latest
+    container_name: printset-mysql
     environment:
-      - 'MYSQL_DATABASE=mydatabase'
-      - 'MYSQL_PASSWORD=root'
-      - 'MYSQL_ROOT_PASSWORD=root'
-      - 'MYSQL_USER=user'
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_TCP_PORT: ${MYSQL_SERVER_PORT}
+    volumes:
+      - ./create_database.mysql:/docker-entrypoint-initdb.d/init.sql
+    expose:
+      - ${MYSQL_SERVER_PORT}:${MYSQL_SERVER_PORT}
     ports:
-      - '3306'
+      - ${MYSQL_SERVER_PORT}:${MYSQL_SERVER_PORT}
+    command: --init-file /docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s      
+    restart: on-failure
+  printset:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${WEBAPP_SERVER_PORT}:${WEBAPP_SERVER_PORT}"
+    healthcheck:
+      test: ["CMD", "curl", "https://localhost:${WEBAPP_SERVER_PORT}", "-k"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s      
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
